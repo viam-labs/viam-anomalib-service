@@ -1,0 +1,20 @@
+{
+  "$schema": "https://dl.viam.dev/module.schema.json",
+  "module_id": "viam-labs:anomalib",
+  "visibility": "public",
+  "description": "Anomaly detection vision service for Anomalib models served by an mlmodel service such as erh:openvino:mlmodel.",
+  "models": [
+    {
+      "api": "rdk:service:vision",
+      "model": "viam-labs:anomalib:vision",
+      "short_description": "Anomaly classifications, detections and heatmaps from an Anomalib model."
+    }
+  ],
+  "entrypoint": "dist/main",
+  "build": {
+    "setup": "./setup.sh",
+    "build": "./build.sh",
+    "path": "dist/archive.tar.gz",
+    "arch": ["linux/amd64", "windows/amd64"]
+  }
+}
