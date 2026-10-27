@@ -124,3 +124,37 @@ async def test_from_camera_requires_a_camera():
 async def test_properties():
     p = await make_service(FakeMLModel()).get_properties()
     assert p.classifications_supported and p.detections_supported and not p.object_point_clouds_supported
+
+
+async def test_detections_scaled_to_original_image():
+    dets = await make_service(FakeMLModel(score=0.9)).get_detections(make_image())
+    assert len(dets) == 2
+    small, big = sorted(dets, key=lambda d: d.x_min)
+    # model cols 2..5 and 20..29 of 32 -> image cols ~4..12 and ~40..60 of 64 (bilinear, threshold 0.5)
+    assert 2 <= small.x_min <= 6 and 10 <= small.x_max <= 14
+    assert 38 <= big.x_min <= 42 and 58 <= big.x_max <= 62
+    for d in dets:
+        assert d.class_name == "anomaly"
+        assert 0 <= d.x_min_normalized <= d.x_max_normalized <= 1
+        assert 0 < d.confidence <= 1
+
+
+async def test_no_detections_when_image_is_normal():
+    assert await make_service(FakeMLModel(score=0.3)).get_detections(make_image()) == []
+
+
+async def test_capture_all_from_default_camera():
+    cam = FakeCamera("cam", make_image())
+    svc = make_service(FakeMLModel(score=0.9), cam, camera_name="cam")
+    res = await svc.capture_all_from_camera("", return_image=True, return_classifications=True, return_detections=True)
+    assert res.image is not None
+    assert res.classifications[0].class_name == "anomalous"
+    assert len(res.detections) == 2
+
+
+async def test_heatmap_command():
+    cam = FakeCamera("cam", make_image())
+    out = await make_service(FakeMLModel(score=0.9), cam, camera_name="cam").do_command({"command": "heatmap"})
+    assert out["label"] == "anomalous" and out["score"] == pytest.approx(0.9)
+    img = cv2.imdecode(np.frombuffer(base64.b64decode(out["image"]), np.uint8), cv2.IMREAD_COLOR)
+    assert img.shape == (H, W, 3)
