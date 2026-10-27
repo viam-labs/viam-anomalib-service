@@ -29,8 +29,8 @@ def main() -> None:
 
     import anomalib
     import openvino as ov
+    import torch
     from anomalib.data import Folder
-    from anomalib.deploy import ExportType
     from anomalib.engine import Engine
     from anomalib.models import get_model
 
@@ -58,14 +58,23 @@ def main() -> None:
     results = engine.test(model=model, datamodule=datamodule)
     metrics = results[0] if results else {}
 
-    # input_size is required, otherwise H/W export as dynamic and the vision service can't read them.
-    engine.export(model=model, export_type=ExportType.OPENVINO, export_root=work / "export", input_size=size)
-    xml = next((work / "export").rglob("model.xml"))
+    # Convert directly at batch 1: engine.export traces with batch 2 and PatchCore's graph specializes to it.
+    # Returning only the two float outputs also drops the bool ones, which break viam-sdk's mlmodel serialization.
+    class Wrapper(torch.nn.Module):
+        def __init__(self, m):
+            super().__init__()
+            self.m = m
 
-    # Keep only the float outputs the vision service reads. The bool outputs (pred_label, pred_mask) come back
-    # from erh:openvino as np.bool_, which viam-sdk's mlmodel gRPC serialization rejects (KeyError: 'bool').
-    full = ov.Core().read_model(xml)
-    ir = ov.Model([full.output("pred_score"), full.output("anomaly_map")], full.get_parameters(), "anomalib")
+        def forward(self, x):
+            r = self.m(x)  # pre_processor -> model -> post_processor
+            return r.pred_score, r.anomaly_map
+
+    model = model.cpu().eval()
+    s = args.image_size
+    ir = ov.convert_model(Wrapper(model), example_input=torch.zeros(1, 3, s, s), input=[1, 3, s, s])
+    ir.input(0).tensor.set_names({"input"})
+    ir.output(0).tensor.set_names({"pred_score"})
+    ir.output(1).tensor.set_names({"anomaly_map"})
     ov.save_model(ir, out / "model.xml", compress_to_fp16=False)
     metadata = {
         "model": args.model,
