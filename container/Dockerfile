@@ -1,4 +1,4 @@
-# viamlabs/anomalib-train: environment for the anomalib Viam training script (script itself lives in the registry).
+# hipsterbrown/anomalib-train: environment for the anomalib Viam training script (script itself lives in the registry).
 FROM --platform=linux/amd64 python:3.12-slim
 
 # libGL/glib for opencv inside anomalib.
