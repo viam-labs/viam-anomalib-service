@@ -2,6 +2,7 @@
   "$schema": "https://dl.viam.dev/module.schema.json",
   "module_id": "viam-labs:anomalib",
   "visibility": "public",
+  "url": "https://github.com/viam-labs/viam-anomalib-service",
   "description": "Anomaly detection vision service for Anomalib models served by an mlmodel service such as erh:openvino:mlmodel.",
   "models": [
     {
