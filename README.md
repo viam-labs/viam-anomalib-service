@@ -20,7 +20,7 @@ This repo provides:
    ```bash
    viam train submit custom from-registry --org-id=<your org> --dataset-id=<your dataset> \
      --model-name=my-anomaly --model-version=1 \
-     --script-name=hackathons:anomalib-patchcore --version=0.1.0 \
+     --script-name=hackathons:anomalib-patchcore --version=0.1.1 \
      --container-id=fa2d674f-bedd-4645-9909-e5b126930f92 \
      --args=model=patchcore,image_size=256
    ```
