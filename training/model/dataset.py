@@ -13,6 +13,15 @@ MIN_ANOMALOUS = 4  # below this the val split taken from test can't calibrate a 
 LOGGER = logging.getLogger(__name__)
 
 
+def _suffix(src: Path) -> str:
+    # Viam cloud datasets store images without extensions; anomalib's Folder globs by extension.
+    # Loaders sniff content, so the suffix only has to be an image one.
+    if src.suffix.lower() in (".jpg", ".jpeg", ".png"):
+        return src.suffix.lower()
+    with open(src, "rb") as f:
+        return ".png" if f.read(4) == b"\x89PNG" else ".jpg"
+
+
 def prepare(dataset_file, work_dir) -> dict:
     work = Path(work_dir)
     for label in (NORMAL, ANOMALOUS):
@@ -32,7 +41,7 @@ def prepare(dataset_file, work_dir) -> dict:
             else:
                 label = ours.pop()
                 src = Path(row["image_path"])
-                os.symlink(src, work / label / f"{i:06d}{src.suffix}")
+                os.symlink(src, work / label / f"{i:06d}{_suffix(src)}")
                 counts[label] += 1
     LOGGER.info("dataset: %s", counts)
     if counts[NORMAL] < MIN_NORMAL:
