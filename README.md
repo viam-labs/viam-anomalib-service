@@ -8,7 +8,7 @@ This repo provides:
 - **`viam-labs:anomalib:vision`** — a vision service. It turns the output of an Anomalib model, served by
   [`erh:openvino:mlmodel`](https://app.viam.com/module/erh/openvino), into classifications, detections and heatmaps.
 - **`anomalib-patchcore`** — a custom training script. It trains PatchCore by default and exports an OpenVINO IR (`model.xml`/`model.bin`).
-- **`hipsterbrown/anomalib-train:2.7.0`** — the training container (anomalib 2.7.0 + OpenVINO 2026.4).
+- **`hipsterbrown/anomalib-train:2.7.0-cu128`** — the training container (anomalib 2.7.0 + OpenVINO 2026.4).
 
 ## Quickstart
 
@@ -21,7 +21,7 @@ This repo provides:
    viam train submit custom from-registry --org-id=<your org> --dataset-id=<your dataset> \
      --model-name=my-anomaly --model-version=1 \
      --script-name=hackathons:anomalib-patchcore --version=0.1.1 \
-     --container-id=fa2d674f-bedd-4645-9909-e5b126930f92 \
+     --container-id=9accd6e7-2992-47c9-9662-2ca5298fa1f1 \
      --args=model=patchcore,image_size=256
    ```
    `viam train logs --job-id=<id>` shows the image AUROC and F1 at the end.
