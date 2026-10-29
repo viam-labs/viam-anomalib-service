@@ -38,7 +38,7 @@ class AnomalyConfig:
             raise ValueError("camera_name must be a non-empty string when set")
         self.camera_name: Optional[str] = cam.strip() if cam else None
 
-        t = attrs.get("threshold", 0.5)
+        t = attrs.get("threshold", 0.2)
         if isinstance(t, bool) or not isinstance(t, (int, float)) or not 0.0 <= t <= 1.0:
             raise ValueError("threshold must be a number between 0 and 1")
         self.threshold = float(t)

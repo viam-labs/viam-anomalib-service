@@ -99,7 +99,7 @@ async def test_sends_resized_float_input():
     assert 0.0 <= t.min() and t.max() <= 1.0
 
 
-@pytest.mark.parametrize("score,label,conf", [(0.7, "anomalous", 0.7), (0.5, "anomalous", 0.5), (0.3, "normal", 0.7)])
+@pytest.mark.parametrize("score,label,conf", [(0.7, "anomalous", 0.7), (0.2, "anomalous", 0.2), (0.1, "normal", 0.9)])
 async def test_classification(score, label, conf):
     [c] = await make_service(FakeMLModel(score=score)).get_classifications(make_image(), 1)
     assert c.class_name == label
@@ -130,7 +130,7 @@ async def test_detections_scaled_to_original_image():
     dets = await make_service(FakeMLModel(score=0.9)).get_detections(make_image())
     assert len(dets) == 2
     small, big = sorted(dets, key=lambda d: d.x_min)
-    # model cols 2..5 and 20..29 of 32 -> image cols ~4..12 and ~40..60 of 64 (bilinear, threshold 0.5)
+    # model cols 2..5 and 20..29 of 32 -> image cols ~4..12 and ~40..60 of 64 (bilinear, threshold 0.2)
     assert 2 <= small.x_min <= 6 and 10 <= small.x_max <= 14
     assert 38 <= big.x_min <= 42 and 58 <= big.x_max <= 62
     for d in dets:
@@ -140,7 +140,7 @@ async def test_detections_scaled_to_original_image():
 
 
 async def test_no_detections_when_image_is_normal():
-    assert await make_service(FakeMLModel(score=0.3)).get_detections(make_image()) == []
+    assert await make_service(FakeMLModel(score=0.1)).get_detections(make_image()) == []
 
 
 async def test_capture_all_from_default_camera():

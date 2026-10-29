@@ -47,7 +47,7 @@ This repo provides:
 |---|---|---|---|
 | `mlmodel_name` | yes | | mlmodel service that serves the Anomalib export, e.g. `erh:openvino:mlmodel` |
 | `camera_name` | no | | default camera for `*FromCamera` calls |
-| `threshold` | no | `0.5` | anomaly score cutoff, 0–1. Raise it if real lighting causes false positives |
+| `threshold` | no | `0.2` | anomaly score cutoff, 0–1. Lower it if defects are missed; raise it if real lighting causes false positives |
 
 ## Training args
 
