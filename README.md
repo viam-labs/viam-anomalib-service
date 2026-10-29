@@ -35,6 +35,19 @@ This repo provides:
    { "name": "anomaly", "api": "rdk:service:vision", "model": "viam-labs:anomalib:vision",
      "attributes": { "mlmodel_name": "ov", "camera_name": "cam" } }
    ```
+   **Tip: run PatchCore on the GPU in f32.** Add `"device": "GPU", "inference_precision": "f32"` to the `ov` attributes.
+   On a Core Ultra X7 358H, mean latency per 256×256 image was:
+
+   | Device | Mean latency |
+   |---|---|
+   | Arc iGPU, f32 | 31 ms |
+   | CPU | 77 ms |
+   | NPU | 158 ms |
+
+   The default `AUTO` picks the NPU, which is the slowest of the three for this model.
+   Keep f32: with the GPU's default f16, `pred_score` is still correct but `anomaly_map` comes back all zeros, so no boxes and an empty heatmap.
+   If OpenVINO doesn't list a `GPU` device, the host's Intel compute runtime is probably too old for the iGPU.
+   See the [erh:viam-openvino README](https://github.com/erh/viam-openvino#host-prerequisites-for-gpu-and-npu).
 5. **Use.**
    - `GetClassifications` returns `anomalous` (confidence = anomaly score) or `normal` (confidence = 1 − score).
    - `GetDetections` returns boxes around anomalous regions, or no boxes when the score is below `threshold`.
