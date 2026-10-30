@@ -7,7 +7,7 @@ This repo provides:
 
 - **`viam-labs:anomalib:vision`** — a vision service. It turns the output of an Anomalib model, served by
   [`erh:openvino:mlmodel`](https://app.viam.com/module/erh/openvino), into classifications, detections and heatmaps.
-- **`anomalib-patchcore`** — a custom training script. It trains PatchCore by default and exports an OpenVINO IR (`model.xml`/`model.bin`).
+- **`anomalib-train`** — a custom training script. It trains any supported Anomalib model (PatchCore by default) and exports an OpenVINO IR (`model.xml`/`model.bin`).
 - **`hipsterbrown/anomalib-train:2.7.0-cu128`** — the training container (anomalib 2.7.0 + OpenVINO 2026.4).
 
 ## Quickstart
@@ -20,7 +20,7 @@ This repo provides:
    ```bash
    viam train submit custom from-registry --org-id=<your org> --dataset-id=<your dataset> \
      --model-name=my-anomaly --model-version=1 \
-     --script-name=hackathons:anomalib-patchcore --version=0.1.1 \
+     --script-name=hackathons:anomalib-train --version=0.2.0 \
      --container-id=9accd6e7-2992-47c9-9662-2ca5298fa1f1 \
      --args=model=patchcore,image_size=256
    ```
@@ -68,9 +68,26 @@ This repo provides:
 |---|---|---|
 | `model` | `patchcore` | any Anomalib image model name |
 | `image_size` | `256` | square input size in pixels |
+| `max_epochs` | `20` | epoch cap for iteratively trained models; PatchCore, PaDiM, DFKDE and DFM always run one pass |
+| `train_batch_size` | `32` | training batch size; EfficientAd requires `1` |
 
 The export takes one RGB image, `input` `[1,3,S,S]` with float values from 0 to 1, and produces two outputs,
 `pred_score` `[1]` and `anomaly_map` `[1,1,S,S]`.
+
+Models checked on `mvtec-bottle` by running the export through this vision service:
+
+| `model` | Status | Notes |
+|---|---|---|
+| `patchcore` | works | the default |
+| `padim` | works | |
+| `stfpm` | works | |
+| `efficient_ad` | works | needs `train_batch_size=1`; downloads Imagenette (1.5 GB) during training |
+| `fastflow` | works | set the vision service `threshold` to `0.5`; at `0.2` good parts come out anomalous |
+| `dfm` | classification only | `anomaly_map` is all zeros, so no boxes or heatmap; use `threshold` `0.5` |
+| `draem` | not usable | after 20 epochs good and defective parts score the same; downloads DTD (625 MB) during training |
+| `cflow` | not usable | the export returns `NaN` for defective parts |
+| `reverse_distillation` | unsupported | OpenVINO can't convert `aten::cosine_similarity` |
+| `dfkde` | unsupported | produces an image score only, no `anomaly_map`, so the export fails |
 
 No parts? The hackathons org has an `mvtec-bottle` dataset (`6ae0082a78f241c0f6d45593`) with 209 `normal` and 20
 `anomalous` images from MVTec AD. It can be recreated in any org with `scripts/upload_mvtec.py`.
