@@ -17,6 +17,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--model_output_directory", required=True)
     p.add_argument("--model", default="patchcore")
     p.add_argument("--image_size", type=int, default=256)
+    # Single-pass models (PatchCore, PaDiM, DFKDE, DFM) force max_epochs=1 themselves; this only bounds the iterative ones.
+    p.add_argument("--max_epochs", type=int, default=20)
+    p.add_argument("--train_batch_size", type=int, default=32)  # EfficientAd requires 1
     args, unknown = p.parse_known_args()
     if unknown:
         LOGGER.warning("ignoring unknown args: %s", unknown)
@@ -32,6 +35,7 @@ def main() -> None:
     import torch
     from anomalib.data import Folder
     from anomalib.engine import Engine
+    from anomalib.metrics import AUROC, Evaluator, F1Score
     from anomalib.models import get_model
 
     out = Path(args.model_output_directory)
@@ -42,7 +46,14 @@ def main() -> None:
 
     # Anomalib v2: image size goes through the model's pre-processor, not the datamodule.
     model_cls = type(get_model(args.model))  # ponytail: builds the model once just to find its class
-    model = get_model(args.model, pre_processor=model_cls.configure_pre_processor(image_size=size))
+    # Image metrics only: Viam datasets have no pixel masks, and some models (FastFlow) default to strict pixel metrics.
+    evaluator = Evaluator(
+        test_metrics=[
+            AUROC(fields=["pred_score", "gt_label"], prefix="image_"),
+            F1Score(fields=["pred_label", "gt_label"], prefix="image_"),
+        ]
+    )
+    model = get_model(args.model, pre_processor=model_cls.configure_pre_processor(image_size=size), evaluator=evaluator)
 
     has_anomalous = counts[ANOMALOUS] > 0
     datamodule = Folder(
@@ -51,9 +62,11 @@ def main() -> None:
         normal_dir=NORMAL,
         abnormal_dir=ANOMALOUS if has_anomalous else None,
         test_split_mode="from_dir" if has_anomalous else "synthetic",
+        train_batch_size=args.train_batch_size,
     )
 
-    engine = Engine(default_root_dir=work / "runs")
+    # One device: Viam's GPU nodes have two, and Lightning would otherwise launch DDP, running this whole script per rank.
+    engine = Engine(default_root_dir=work / "runs", max_epochs=args.max_epochs, devices=1)
     engine.fit(model=model, datamodule=datamodule)
     results = engine.test(model=model, datamodule=datamodule)
     metrics = results[0] if results else {}
@@ -79,6 +92,7 @@ def main() -> None:
     metadata = {
         "model": args.model,
         "image_size": args.image_size,
+        "max_epochs": args.max_epochs,
         "input_name": ir.inputs[0].any_name,
         "output_names": [o.any_name for o in ir.outputs],
         "image_auroc": float(metrics.get("image_AUROC", float("nan"))),
