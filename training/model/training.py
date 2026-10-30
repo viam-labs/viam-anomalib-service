@@ -3,12 +3,21 @@
 import argparse
 import json
 import logging
+import math
 import tempfile
 from pathlib import Path
 
 from model.dataset import ANOMALOUS, NORMAL, prepare
 
 LOGGER = logging.getLogger("anomalib-train")
+METRICS_FILE = "model_metrics.json"  # Viam reads this from the output directory and charts each key on the job page
+
+
+def model_metrics(history: dict, test: dict) -> dict:
+    """Viam drops values that aren't lists, and its JSON parse fails on NaN, so wrap scalars and keep finite values only."""
+    lists = {**history, **{k: [float(v)] for k, v in test.items()}}
+    lists = {k: [x for x in v if math.isfinite(x)] for k, v in lists.items()}
+    return {k: v for k, v in lists.items() if v}
 
 
 def parse_args() -> argparse.Namespace:
@@ -20,6 +29,7 @@ def parse_args() -> argparse.Namespace:
     # Single-pass models (PatchCore, PaDiM, DFKDE, DFM) force max_epochs=1 themselves; this only bounds the iterative ones.
     p.add_argument("--max_epochs", type=int, default=20)
     p.add_argument("--train_batch_size", type=int, default=32)  # EfficientAd requires 1
+    p.add_argument("--seed", type=int, default=0)  # fixes the val/test split, so retrains on the same data are comparable
     args, unknown = p.parse_known_args()
     if unknown:
         LOGGER.warning("ignoring unknown args: %s", unknown)
@@ -37,6 +47,21 @@ def main() -> None:
     from anomalib.engine import Engine
     from anomalib.metrics import AUROC, Evaluator, F1Score
     from anomalib.models import get_model
+    from lightning.pytorch import Callback, seed_everything
+
+    class LossHistory(Callback):
+        """Per-epoch train_* values the model logs (single-pass models like PatchCore log none)."""
+
+        def __init__(self):
+            self.history = {}
+
+        def on_train_epoch_end(self, trainer, pl_module):
+            for k, v in trainer.callback_metrics.items():
+                # Logging on_step and on_epoch adds _step and _epoch copies next to the plain key.
+                if k.startswith("train_") and not k.endswith(("_step", "_epoch")):
+                    self.history.setdefault(k, []).append(float(v))
+
+    seed_everything(args.seed)
 
     out = Path(args.model_output_directory)
     out.mkdir(parents=True, exist_ok=True)
@@ -63,10 +88,12 @@ def main() -> None:
         abnormal_dir=ANOMALOUS if has_anomalous else None,
         test_split_mode="from_dir" if has_anomalous else "synthetic",
         train_batch_size=args.train_batch_size,
+        seed=args.seed,
     )
 
     # One device: Viam's GPU nodes have two, and Lightning would otherwise launch DDP, running this whole script per rank.
-    engine = Engine(default_root_dir=work / "runs", max_epochs=args.max_epochs, devices=1)
+    losses = LossHistory()
+    engine = Engine(default_root_dir=work / "runs", max_epochs=args.max_epochs, devices=1, callbacks=[losses])
     engine.fit(model=model, datamodule=datamodule)
     results = engine.test(model=model, datamodule=datamodule)
     metrics = results[0] if results else {}
@@ -93,6 +120,7 @@ def main() -> None:
         "model": args.model,
         "image_size": args.image_size,
         "max_epochs": args.max_epochs,
+        "seed": args.seed,
         "input_name": ir.inputs[0].any_name,
         "output_names": [o.any_name for o in ir.outputs],
         "image_auroc": float(metrics.get("image_AUROC", float("nan"))),
@@ -103,6 +131,8 @@ def main() -> None:
     }
     (out / "metadata.json").write_text(json.dumps(metadata, indent=2))
     LOGGER.info("exported %s", json.dumps(metadata))
+    test = {k: v for k, v in metrics.items() if k in ("image_AUROC", "image_F1Score")}
+    (out / METRICS_FILE).write_text(json.dumps(model_metrics(losses.history, test)))
 
 
 if __name__ == "__main__":

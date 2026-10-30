@@ -20,11 +20,13 @@ This repo provides:
    ```bash
    viam train submit custom from-registry --org-id=<your org> --dataset-id=<your dataset> \
      --model-name=my-anomaly --model-version=1 \
-     --script-name=hackathons:anomalib-train --version=0.2.0 \
+     --script-name=hackathons:anomalib-train --version=0.3.0 \
      --container-id=9accd6e7-2992-47c9-9662-2ca5298fa1f1 \
      --args=model=patchcore,image_size=256
    ```
-   `viam train logs --job-id=<id>` shows the image AUROC and F1 at the end.
+   `viam train logs --job-id=<id>` shows the image AUROC and F1 at the end. The script also writes `model_metrics.json`
+   (per-epoch training loss, image AUROC and F1), which the job's page in the app charts when model metrics are
+   enabled for your org.
 4. **Deploy.** Add the `my-anomaly` model to your machine. If the `erh:openvino` and `viam-labs:anomalib` modules
    don't come with it, add these two services:
    ```json
@@ -70,6 +72,7 @@ This repo provides:
 | `image_size` | `256` | square input size in pixels |
 | `max_epochs` | `20` | epoch cap for iteratively trained models; PatchCore, PaDiM, DFKDE and DFM always run one pass |
 | `train_batch_size` | `32` | training batch size; EfficientAd requires `1` |
+| `seed` | `0` | random seed for the validation/test split and training; keep it fixed to compare retrains |
 
 The export takes one RGB image, `input` `[1,3,S,S]` with float values from 0 to 1, and produces two outputs,
 `pred_score` `[1]` and `anomaly_map` `[1,1,S,S]`.
