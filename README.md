@@ -7,7 +7,7 @@ This repo provides:
 
 - **`viam-labs:anomalib:vision`** — a vision service. It turns the output of an Anomalib model, served by
   [`erh:openvino:mlmodel`](https://app.viam.com/module/erh/openvino), into classifications, detections and heatmaps.
-- **`anomalib-train`** — a custom training script. It trains any supported Anomalib model (PatchCore by default) and exports an OpenVINO IR (`model.xml`/`model.bin`).
+- **`anomalib-train`** — a custom training script. It trains any supported Anomalib model (PatchCore by default) and exports an OpenVINO IR (`model.xml`/`model.bin`) or, with `export_format=onnx`, `model.onnx`.
 - **`hipsterbrown/anomalib-train:2.7.0-cu128`** — the training container (anomalib 2.7.0 + OpenVINO 2026.4).
 
 ## Quickstart
@@ -20,7 +20,7 @@ This repo provides:
    ```bash
    viam train submit custom from-registry --org-id=<your org> --dataset-id=<your dataset> \
      --model-name=my-anomaly --model-version=1 \
-     --script-name=hackathons:anomalib-train --version=0.2.0 \
+     --script-name=hackathons:anomalib-train --version=0.3.0 \
      --container-id=9accd6e7-2992-47c9-9662-2ca5298fa1f1 \
      --args=model=patchcore,image_size=256
    ```
@@ -70,6 +70,7 @@ This repo provides:
 | `image_size` | `256` | square input size in pixels |
 | `max_epochs` | `20` | epoch cap for iteratively trained models; PatchCore, PaDiM, DFKDE and DFM always run one pass |
 | `train_batch_size` | `32` | training batch size; EfficientAd requires `1` |
+| `export_format` | `openvino` | `openvino` (`model.xml`/`model.bin`) or `onnx` (`model.onnx`); same input and outputs either way |
 
 The export takes one RGB image, `input` `[1,3,S,S]` with float values from 0 to 1, and produces two outputs,
 `pred_score` `[1]` and `anomaly_map` `[1,1,S,S]`.

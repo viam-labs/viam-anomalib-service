@@ -1,4 +1,4 @@
-"""Viam custom training script: train an Anomalib model on a Viam dataset and export OpenVINO IR."""
+"""Viam custom training script: train an Anomalib model on a Viam dataset and export OpenVINO IR or ONNX."""
 
 import argparse
 import json
@@ -20,6 +20,7 @@ def parse_args() -> argparse.Namespace:
     # Single-pass models (PatchCore, PaDiM, DFKDE, DFM) force max_epochs=1 themselves; this only bounds the iterative ones.
     p.add_argument("--max_epochs", type=int, default=20)
     p.add_argument("--train_batch_size", type=int, default=32)  # EfficientAd requires 1
+    p.add_argument("--export_format", choices=["openvino", "onnx"], default="openvino")
     args, unknown = p.parse_known_args()
     if unknown:
         LOGGER.warning("ignoring unknown args: %s", unknown)
@@ -31,7 +32,6 @@ def main() -> None:
     args = parse_args()
 
     import anomalib
-    import openvino as ov
     import torch
     from anomalib.data import Folder
     from anomalib.engine import Engine
@@ -84,17 +84,29 @@ def main() -> None:
 
     model = model.cpu().eval()
     s = args.image_size
-    ir = ov.convert_model(Wrapper(model), example_input=torch.zeros(1, 3, s, s), input=[1, 3, s, s])
-    ir.input(0).tensor.set_names({"input"})
-    ir.output(0).tensor.set_names({"pred_score"})
-    ir.output(1).tensor.set_names({"anomaly_map"})
-    ov.save_model(ir, out / "model.xml", compress_to_fp16=False)
+    example = torch.zeros(1, 3, s, s)
+    input_names, output_names = ["input"], ["pred_score", "anomaly_map"]
+    if args.export_format == "onnx":
+        # TorchScript exporter: traces like ov.convert_model does; the dynamo exporter needs onnxscript.
+        torch.onnx.export(
+            Wrapper(model), example, out / "model.onnx",
+            input_names=input_names, output_names=output_names, dynamo=False,
+        )
+    else:
+        import openvino as ov
+
+        ir = ov.convert_model(Wrapper(model), example_input=example, input=[1, 3, s, s])
+        ir.input(0).tensor.set_names({input_names[0]})
+        for i, name in enumerate(output_names):
+            ir.output(i).tensor.set_names({name})
+        ov.save_model(ir, out / "model.xml", compress_to_fp16=False)
     metadata = {
         "model": args.model,
         "image_size": args.image_size,
         "max_epochs": args.max_epochs,
-        "input_name": ir.inputs[0].any_name,
-        "output_names": [o.any_name for o in ir.outputs],
+        "export_format": args.export_format,
+        "input_name": input_names[0],
+        "output_names": output_names,
         "image_auroc": float(metrics.get("image_AUROC", float("nan"))),
         "image_f1": float(metrics.get("image_F1Score", float("nan"))),
         "n_normal": counts[NORMAL],
