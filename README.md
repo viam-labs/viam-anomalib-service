@@ -8,6 +8,8 @@ This repo provides:
 - **`viam-labs:anomalib:vision`** — a vision service. It turns the output of an Anomalib model, served by
   [`erh:openvino:mlmodel`](https://app.viam.com/module/erh/openvino), into classifications, detections and heatmaps.
 - **`anomalib-train`** — a custom training script. It trains any supported Anomalib model (PatchCore by default) and exports an OpenVINO IR (`model.xml`/`model.bin`) or, with `export_format=onnx`, `model.onnx`.
+- **`anomalib-train-onnx`** — the same script, registered with the ONNX framework so its models are labeled ONNX in Viam.
+  Pass `export_format=onnx` with it; the script still defaults to OpenVINO.
 - **`hipsterbrown/anomalib-train:2.7.0-cu128`** — the training container (anomalib 2.7.0 + OpenVINO 2026.4).
 
 ## Quickstart
@@ -27,6 +29,10 @@ This repo provides:
    `viam train logs --job-id=<id>` shows the image AUROC and F1 at the end. The script also writes `model_metrics.json`
    (per-epoch training loss, image AUROC and F1), which the job's page in the app charts when model metrics are
    enabled for your org.
+
+   For an ONNX model, use `--script-name=hackathons:anomalib-train-onnx` and add `export_format=onnx` to `--args`.
+   Viam labels a model with the framework of the script that trained it, and every version of a model must keep that
+   label, so give an ONNX model its own model name.
 4. **Deploy.** Add the `my-anomaly` model to your machine. If the `erh:openvino` and `viam-labs:anomalib` modules
    don't come with it, add these two services:
    ```json
