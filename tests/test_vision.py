@@ -126,6 +126,7 @@ async def test_from_camera_requires_a_camera():
 async def test_properties():
     p = await make_service(FakeMLModel()).get_properties()
     assert p.classifications_supported and p.detections_supported and not p.object_point_clouds_supported
+    assert not p.detections_3d_supported
 
 
 async def test_detections_scaled_to_original_image():

@@ -204,6 +204,7 @@ class AnomalyVision(Vision, EasyResource):
             classifications_supported=True,
             detections_supported=True,
             object_point_clouds_supported=False,
+            detections_3d_supported=False,
             default_camera=(self.cfg.camera_name or "") if self.cfg else "",
         )
 
