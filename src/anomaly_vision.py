@@ -167,10 +167,13 @@ class AnomalyVision(Vision, EasyResource):
         return_classifications: bool = False,
         return_detections: bool = False,
         return_object_point_clouds: bool = False,
+        return_detections_3d: bool = False,
         *,
         extra: Optional[Mapping[str, ValueTypes]] = None,
         timeout: Optional[float] = None,
     ) -> CaptureAllResult:
+        # The SDK's gRPC handler always passes return_detections_3d (viam-sdk >= 0.85). Point clouds and 3D detections
+        # are not supported, so both flags are accepted and leave their fields empty.
         result = CaptureAllResult()
         image = await self._camera_image(camera_name)
         if return_image:

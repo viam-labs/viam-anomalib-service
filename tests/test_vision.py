@@ -1,4 +1,5 @@
 import base64
+import inspect
 
 import cv2
 import numpy as np
@@ -8,6 +9,7 @@ from viam.media.video import CameraMimeType, NamedImage, ViamImage
 from viam.proto.app.robot import ComponentConfig
 from viam.proto.common import ResponseMetadata
 from viam.services.mlmodel import Metadata, MLModel, TensorInfo
+from viam.services.vision import Vision
 from viam.utils import dict_to_struct
 
 from anomaly_vision import AnomalyVision
@@ -150,6 +152,33 @@ async def test_capture_all_from_default_camera():
     assert res.image is not None
     assert res.classifications[0].class_name == "anomalous"
     assert len(res.detections) == 2
+
+
+def test_capture_all_accepts_every_sdk_parameter():
+    """The gRPC handler passes every parameter of Vision.capture_all_from_camera by keyword, so a missing one is a
+    TypeError on the app's vision test card even though direct calls work."""
+    sdk = inspect.signature(Vision.capture_all_from_camera).parameters
+    ours = inspect.signature(AnomalyVision.capture_all_from_camera).parameters
+    assert [p for p in sdk if p not in ours] == []
+
+
+async def test_capture_all_with_rpc_handler_arguments():
+    cam = FakeCamera("cam", make_image())
+    svc = make_service(FakeMLModel(score=0.9), cam, camera_name="cam")
+    res = await svc.capture_all_from_camera(
+        "",
+        return_image=True,
+        return_classifications=True,
+        return_detections=True,
+        return_object_point_clouds=True,
+        return_detections_3d=True,
+        extra={},
+        timeout=None,
+    )
+    assert res.classifications[0].class_name == "anomalous"
+    assert len(res.detections) == 2
+    assert not res.objects
+    assert not res.detections_3d
 
 
 async def test_heatmap_command():
